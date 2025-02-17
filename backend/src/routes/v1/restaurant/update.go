@@ -14,28 +14,34 @@ import (
 func UpdateRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get user ID from JWT
-		userID, exists := c.Get("userid")
+		userID, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		var req struct {
-			ID      string `json:"id" binding:"required"`
-			Name    string `json:"name" binding:"required"`
-			Address string `json:"address" binding:"required"`
-			Nonce   string `json:"nonce" binding:"required"`
-		}
-
-		// Parse JSON request
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Get nonce from header
+		nonce := c.GetHeader("X-Nonce")
+		if nonce == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Nonce missing"})
 			return
 		}
 
 		// Validate Nonce (Prevent Replay Attacks)
-		if !security.ValidateNonce(req.Nonce) {
+		if !security.ValidateNonce(nonce) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid nonce"})
+			return
+		}
+
+		// Parse JSON request
+		var req struct {
+			ID      string `json:"id" binding:"required"`
+			Name    string `json:"name" binding:"required"`
+			Address string `json:"address" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 

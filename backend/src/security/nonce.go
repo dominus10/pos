@@ -10,23 +10,23 @@ var (
 	mu         sync.Mutex
 )
 
-// ValidateNonce checks if a nonce is valid
+// ValidateNonce checks if a nonce is valid and prevents replay attacks.
 func ValidateNonce(nonce string) bool {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// If nonce exists, reject it (replay detected)
+	// Reject if the nonce was already used (Replay Attack Prevention)
 	if _, exists := nonceStore[nonce]; exists {
 		return false
 	}
 
-	// Store nonce with expiration time (5 minutes)
+	// Store nonce with expiration (e.g., 5 min)
 	nonceStore[nonce] = time.Now().Add(5 * time.Minute)
 
 	return true
 }
 
-// CleanupExpiredNonces clears old nonces periodically
+// CleanupExpiredNonces removes expired nonces
 func CleanupExpiredNonces() {
 	mu.Lock()
 	defer mu.Unlock()
