@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dominus10/pos/db"
+	"github.com/dominus10/pos/src/security"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -12,16 +13,32 @@ import (
 
 func UpdateRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get user ID from JWT
+		userID, exists := c.Get("userid")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
 		var req struct {
-			ID    	string `json:"id" binding:"required"`
+			ID      string `json:"id" binding:"required"`
 			Name    string `json:"name" binding:"required"`
 			Address string `json:"address" binding:"required"`
+			Nonce   string `json:"nonce" binding:"required"`
 		}
+
+		// Parse JSON request
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		
+
+		// Validate Nonce (Prevent Replay Attacks)
+		if !security.ValidateNonce(req.Nonce) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid nonce"})
+			return
+		}
+
 		// Convert string to UUID
 		parsedUUID, err := uuid.Parse(req.ID)
 		if err != nil {
@@ -34,16 +51,28 @@ func UpdateRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 			Bytes: parsedUUID,
 			Valid: true,
 		}
-		_,e := q.UpdateExistingRestaurant(ctx,db.UpdateExistingRestaurantParams{
-			ID: uuidValue,
-			Name: req.Name,
+
+		// Ensure the user owns the restaurant (Authorization)
+		restaurant, err := q.GetRestaurant(ctx, uuidValue)
+		if err != nil || restaurant.ID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+			return
+		}
+
+		// Update restaurant in DB
+		_, err = q.UpdateExistingRestaurant(ctx, db.UpdateExistingRestaurantParams{
+			ID:      uuidValue,
+			Name:    req.Name,
 			Address: req.Address,
 		})
-		if( e != nil){
-			panic("Cannot update!")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Cannot update restaurant"})
+			return
 		}
-		c.JSON(200, gin.H{
-			"message":"Created",
+
+		// Return success response
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Updated successfully",
 		})
 	}
 }
