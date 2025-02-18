@@ -25,8 +25,6 @@ func InsertNewRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 		if( e != nil){
 			panic("Cannot insert")
 		}
-		c.JSON(200, gin.H{
-			"message":"Created",
-		})
+		c.Status(http.StatusCreated)
 	}
 }

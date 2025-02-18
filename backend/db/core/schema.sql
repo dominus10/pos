@@ -15,7 +15,7 @@ CREATE TABLE role (
 
 CREATE TABLE employee (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    restaurant_id UUID NOT NULL REFERENCES restaurant(id) ON DELETE CASCADE,
+    restaurant_id UUID REFERENCES restaurant(id) ON DELETE CASCADE,
     role_id UUID NOT NULL REFERENCES role(id) ON DELETE RESTRICT,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,

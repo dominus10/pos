@@ -77,8 +77,6 @@ func UpdateRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 		}
 
 		// Return success response
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Updated successfully",
-		})
+		c.Status(http.StatusOK)
 	}
 }

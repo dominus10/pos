@@ -34,17 +34,11 @@ func DeleteRestaurant(ctx context.Context, q *db.Queries) gin.HandlerFunc {
 			Valid: true,
 		}
 
-		i,e := q.DeleteRestaurant(ctx,uuidValue)
+		_,e := q.DeleteRestaurant(ctx,uuidValue)
 
 		if( e != nil){
 			panic("Cannot delete!")
 		}
-		c.JSON(200, gin.H{
-			"message":"Deleted",
-			"data": gin.H{
-				"name":i.Name,
-				"address":i.Address,
-			},
-		})
+		c.Status(http.StatusNoContent)
 	}
 }

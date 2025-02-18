@@ -11,6 +11,81 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addEmployee = `-- name: AddEmployee :one
+INSERT INTO employee (restaurant_id, role_id, name, email, password_hash) 
+VALUES (
+  (SELECT id FROM restaurant WHERE restaurant.name = $1),
+  (SELECT id FROM role WHERE role.name = $2), 
+  $3,
+  $4,
+  crypt($5, gen_salt('bf'))
+)
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type AddEmployeeParams struct {
+	Name   string
+	Name_2 string
+	Name_3 string
+	Email  string
+	Crypt  string
+}
+
+func (q *Queries) AddEmployee(ctx context.Context, arg AddEmployeeParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, addEmployee,
+		arg.Name,
+		arg.Name_2,
+		arg.Name_3,
+		arg.Email,
+		arg.Crypt,
+	)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const delegateRoles = `-- name: DelegateRoles :one
+UPDATE employee
+SET role_id = (SELECT id FROM role WHERE role.name = 'cashier')
+WHERE email = $2
+AND restaurant_id = (SELECT id FROM restaurant WHERE restaurant.name = $1)
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type DelegateRolesParams struct {
+	Name  string
+	Email string
+}
+
+func (q *Queries) DelegateRoles(ctx context.Context, arg DelegateRolesParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, delegateRoles, arg.Name, arg.Email)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteRestaurant = `-- name: DeleteRestaurant :one
 DELETE FROM restaurant 
 WHERE id = $1
@@ -27,6 +102,45 @@ func (q *Queries) DeleteRestaurant(ctx context.Context, id pgtype.UUID) (Restaur
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getAllEmployee = `-- name: GetAllEmployee :many
+SELECT e.id, e.name, e.email, r.name AS role
+FROM employee e
+JOIN role r ON e.role_id = r.id
+WHERE e.restaurant_id = (SELECT id FROM restaurant WHERE restaurant.name = $1)
+`
+
+type GetAllEmployeeRow struct {
+	ID    pgtype.UUID
+	Name  string
+	Email string
+	Role  string
+}
+
+func (q *Queries) GetAllEmployee(ctx context.Context, name string) ([]GetAllEmployeeRow, error) {
+	rows, err := q.db.Query(ctx, getAllEmployee, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllEmployeeRow
+	for rows.Next() {
+		var i GetAllEmployeeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Email,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAllRestaurant = `-- name: GetAllRestaurant :many
@@ -93,6 +207,103 @@ func (q *Queries) InsertNewRestaurant(ctx context.Context, arg InsertNewRestaura
 		&i.Name,
 		&i.Address,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const registerRestaurantOwner = `-- name: RegisterRestaurantOwner :one
+INSERT INTO employee (restaurant_id, role_id, name, email, password_hash) 
+VALUES (
+  NULL,
+  (SELECT id FROM role WHERE role.name = 'admin'), 
+  $1::TEXT,
+  $2::TEXT,
+  crypt($3, gen_salt('bf'))
+)
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type RegisterRestaurantOwnerParams struct {
+	Column1 string
+	Column2 string
+	Crypt   string
+}
+
+func (q *Queries) RegisterRestaurantOwner(ctx context.Context, arg RegisterRestaurantOwnerParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, registerRestaurantOwner, arg.Column1, arg.Column2, arg.Crypt)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const removeEmployee = `-- name: RemoveEmployee :one
+DELETE FROM employee 
+WHERE email = $2
+AND restaurant_id = (SELECT id FROM restaurant WHERE restaurant.name = $1)
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type RemoveEmployeeParams struct {
+	Name  string
+	Email string
+}
+
+func (q *Queries) RemoveEmployee(ctx context.Context, arg RemoveEmployeeParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, removeEmployee, arg.Name, arg.Email)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const transferOwnership = `-- name: TransferOwnership :one
+UPDATE employee 
+SET role_id = (SELECT id FROM role WHERE role.name = 'admin')
+WHERE email = $2
+AND restaurant_id = (SELECT id FROM restaurant WHERE restaurant.name = $1)
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type TransferOwnershipParams struct {
+	Name  string
+	Email string
+}
+
+func (q *Queries) TransferOwnership(ctx context.Context, arg TransferOwnershipParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, transferOwnership, arg.Name, arg.Email)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
