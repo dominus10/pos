@@ -32,13 +32,13 @@ VALUES (
 RETURNING *;
 
 -- name: AddEmployee :one
-INSERT INTO employee (restaurant_id, role_id, name, email, password_hash) 
+INSERT INTO employee (restaurant_name, role_name, name, email, password_hash) 
 VALUES (
-  (SELECT id FROM restaurant WHERE restaurant.name = $1),
-  (SELECT id FROM role WHERE role.name = $2), 
-  $3,
-  $4,
-  crypt($5, gen_salt('bf'))
+  (SELECT id FROM restaurant WHERE restaurant.name = sqlc.arg(restaurant_name)),
+  (SELECT id FROM role WHERE role.name = sqlc.arg(role_name)), 
+  $1,
+  $2,
+  crypt($3, gen_salt('bf'))
 )
 RETURNING *;
 

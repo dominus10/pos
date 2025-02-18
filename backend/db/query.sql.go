@@ -12,32 +12,32 @@ import (
 )
 
 const addEmployee = `-- name: AddEmployee :one
-INSERT INTO employee (restaurant_id, role_id, name, email, password_hash) 
+INSERT INTO employee (restaurant_name, role_name, name, email, password_hash) 
 VALUES (
-  (SELECT id FROM restaurant WHERE restaurant.name = $1),
-  (SELECT id FROM role WHERE role.name = $2), 
-  $3,
-  $4,
-  crypt($5, gen_salt('bf'))
+  (SELECT id FROM restaurant WHERE restaurant.name = $4),
+  (SELECT id FROM role WHERE role.name = $5), 
+  $1,
+  $2,
+  crypt($3, gen_salt('bf'))
 )
 RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
 `
 
 type AddEmployeeParams struct {
-	Name   string
-	Name_2 string
-	Name_3 string
-	Email  string
-	Crypt  string
+	Name           string
+	Email          string
+	Crypt          string
+	RestaurantName string
+	RoleName       string
 }
 
 func (q *Queries) AddEmployee(ctx context.Context, arg AddEmployeeParams) (Employee, error) {
 	row := q.db.QueryRow(ctx, addEmployee,
 		arg.Name,
-		arg.Name_2,
-		arg.Name_3,
 		arg.Email,
 		arg.Crypt,
+		arg.RestaurantName,
+		arg.RoleName,
 	)
 	var i Employee
 	err := row.Scan(

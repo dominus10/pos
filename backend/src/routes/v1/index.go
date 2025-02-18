@@ -4,9 +4,8 @@ import (
 	"context"
 
 	"github.com/dominus10/pos/db"
-	"github.com/dominus10/pos/src/middleware"
+	"github.com/dominus10/pos/src/routes/v1/employee"
 	"github.com/dominus10/pos/src/routes/v1/restaurant"
-	"github.com/dominus10/pos/src/routes/v1/user"
 	"github.com/dominus10/pos/src/routes/v1/util"
 	"github.com/gin-gonic/gin"
 )
@@ -20,8 +19,17 @@ func Routes(r *gin.Engine,ctx context.Context,q *db.Queries){
 	}
 }
 
+// func RestaurantRoutes(r *gin.RouterGroup,ctx context.Context,q *db.Queries){
+// 	sub := r.Group("/restaurant", middleware.AuthMiddleware())
+// 	{
+// 		sub.POST("/register", restaurant.InsertNewRestaurant(ctx,q))
+// 		sub.PUT("/register", restaurant.UpdateRestaurant(ctx,q))
+// 		sub.DELETE("/register", restaurant.DeleteRestaurant(ctx,q))
+// 	}
+// }
+
 func RestaurantRoutes(r *gin.RouterGroup,ctx context.Context,q *db.Queries){
-	sub := r.Group("/restaurant", middleware.AuthMiddleware())
+	sub := r.Group("/restaurant")
 	{
 		sub.POST("/register", restaurant.InsertNewRestaurant(ctx,q))
 		sub.PUT("/register", restaurant.UpdateRestaurant(ctx,q))
@@ -32,13 +40,6 @@ func RestaurantRoutes(r *gin.RouterGroup,ctx context.Context,q *db.Queries){
 func UserRoutes(r *gin.RouterGroup,ctx context.Context,q *db.Queries){
 	sub := r.Group("/user")
 	{
-		sub.POST("/register", user.RegisterRestaurantOwner(ctx,q))
-	}
-}
-
-func UserSubRoutes(r *gin.RouterGroup,ctx context.Context,q *db.Queries){
-	sub := r.Group("/guarded",middleware.AuthMiddleware())
-	{
-		sub.POST("/add", restaurant.InsertNewRestaurant(ctx,q))
+		sub.POST("/register", employee.AddEmployee(ctx,q))
 	}
 }
