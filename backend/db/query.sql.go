@@ -104,6 +104,64 @@ func (q *Queries) DeleteRestaurant(ctx context.Context, id pgtype.UUID) (Restaur
 	return i, err
 }
 
+const employeeClockIn = `-- name: EmployeeClockIn :one
+UPDATE employee
+SET clock_in_time = NOW()
+WHERE email = $1 AND password_hash = crypt($2, gen_salt('bf'))
+AND clock_in_time IS NULL -- Prevent duplicate clock-ins
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+type EmployeeClockInParams struct {
+	Email string
+	Crypt string
+}
+
+func (q *Queries) EmployeeClockIn(ctx context.Context, arg EmployeeClockInParams) (Employee, error) {
+	row := q.db.QueryRow(ctx, employeeClockIn, arg.Email, arg.Crypt)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const employeeClockOut = `-- name: EmployeeClockOut :one
+UPDATE employee
+SET clock_out_time = NOW()
+WHERE email = $1
+AND clock_in_time IS NOT NULL -- Ensure employee has clocked in first
+AND clock_out_time IS NULL -- Prevent multiple clock-outs
+RETURNING id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at
+`
+
+func (q *Queries) EmployeeClockOut(ctx context.Context, email string) (Employee, error) {
+	row := q.db.QueryRow(ctx, employeeClockOut, email)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getAllEmployee = `-- name: GetAllEmployee :many
 SELECT e.id, e.name, e.email, r.name AS role
 FROM employee e
@@ -161,6 +219,73 @@ func (q *Queries) GetAllRestaurant(ctx context.Context) ([]Restaurant, error) {
 			&i.Name,
 			&i.Address,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEmployeeByEmail = `-- name: GetEmployeeByEmail :one
+SELECT id, restaurant_id, role_id, name, email, password_hash, clock_in_time, clock_out_time, created_at, updated_at FROM employee
+WHERE email = $1
+`
+
+func (q *Queries) GetEmployeeByEmail(ctx context.Context, email string) (Employee, error) {
+	row := q.db.QueryRow(ctx, getEmployeeByEmail, email)
+	var i Employee
+	err := row.Scan(
+		&i.ID,
+		&i.RestaurantID,
+		&i.RoleID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.ClockInTime,
+		&i.ClockOutTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEmployeeWorkHours = `-- name: GetEmployeeWorkHours :many
+SELECT id, name, clock_in_time, clock_out_time,
+       EXTRACT(EPOCH FROM (clock_out_time - clock_in_time)) / 3600 AS hours_worked
+FROM employee
+WHERE restaurant_id = $1::UUID
+AND clock_in_time IS NOT NULL
+AND clock_out_time IS NOT NULL
+ORDER BY clock_in_time DESC
+`
+
+type GetEmployeeWorkHoursRow struct {
+	ID           pgtype.UUID
+	Name         string
+	ClockInTime  pgtype.Timestamp
+	ClockOutTime pgtype.Timestamp
+	HoursWorked  int32
+}
+
+func (q *Queries) GetEmployeeWorkHours(ctx context.Context, dollar_1 pgtype.UUID) ([]GetEmployeeWorkHoursRow, error) {
+	rows, err := q.db.Query(ctx, getEmployeeWorkHours, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetEmployeeWorkHoursRow
+	for rows.Next() {
+		var i GetEmployeeWorkHoursRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.ClockInTime,
+			&i.ClockOutTime,
+			&i.HoursWorked,
 		); err != nil {
 			return nil, err
 		}

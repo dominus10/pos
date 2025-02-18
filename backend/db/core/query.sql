@@ -42,17 +42,21 @@ VALUES (
 )
 RETURNING *;
 
+-- name: GetEmployeeByEmail :one
+SELECT * FROM employee
+WHERE email = $1;
+
 -- name: EmployeeClockIn :one
 UPDATE employee
 SET clock_in_time = NOW()
-WHERE id = $1::UUID
+WHERE email = $1 AND password_hash = crypt($2, gen_salt('bf'))
 AND clock_in_time IS NULL -- Prevent duplicate clock-ins
 RETURNING *;
 
 -- name: EmployeeClockOut :one
 UPDATE employee
 SET clock_out_time = NOW()
-WHERE id = $1::UUID
+WHERE email = $1
 AND clock_in_time IS NOT NULL -- Ensure employee has clocked in first
 AND clock_out_time IS NULL -- Prevent multiple clock-outs
 RETURNING *;
