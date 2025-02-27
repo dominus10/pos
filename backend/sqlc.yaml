@@ -8,3 +8,11 @@ sql:
         package: "db"
         out: "db"
         sql_package: "pgx/v5"
+  - engine: "postgresql"
+    queries: "./tenant/core/query.sql"
+    schema: "./tenant/core/schema.sql"
+    gen:
+      go:
+        package: "tenant"
+        out: "tenant"
+        sql_package: "pgx/v5"
